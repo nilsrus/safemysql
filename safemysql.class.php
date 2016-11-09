@@ -23,6 +23,8 @@
  * ?n ("name")    - identifiers (table and field names) 
  * ?a ("array")   - complex placeholder for IN() operator  (substituted with string of 'a','b','c' format, without parentesis)
  * ?u ("update")  - complex placeholder for SET operator (substituted with string of `field`='value',`field`='value' format)
+ * ?o ("or") - complex placeholder for SELECT operator (substitution whith string of `field`='value' OR `field`='value' OR `field`='value')
+ * ?m ("and)  - complex placeholder for SELECT operator (substitution whith string of `field`='value' AND `field`='value' AND `field`='value')
  * and
  * ?p ("parsed") - special type placeholder, for inserting already parsed statements without any processing, to avoid double parsing.
  * 
@@ -490,7 +492,7 @@ class SafeMySQL
 	{
 		$query = '';
 		$raw   = array_shift($args);
-		$array = preg_split('~(\?[nsiuap])~u',$raw,null,PREG_SPLIT_DELIM_CAPTURE);
+		$array = preg_split('~(\?[nsiuamop])~u',$raw,null,PREG_SPLIT_DELIM_CAPTURE);
 		$anum  = count($args);
 		$pnum  = floor(count($array) / 2);
 		if ( $pnum != $anum )
@@ -524,6 +526,12 @@ class SafeMySQL
 				case '?u':
 					$part = $this->createSET($value);
 					break;
+				case '?o':
+				    	$part = $this->createOR($value);
+				    	break;
+				case '?m':
+				    	$part = $this->createAND($value);
+				   	break;
 				case '?p':
 					$part = $value;
 					break;
@@ -600,6 +608,48 @@ class SafeMySQL
 		if (!$data)
 		{
 			$this->error("Empty array for SET (?u) placeholder");
+			return;
+		}
+		$query = $comma = '';
+		foreach ($data as $key => $value)
+		{
+			$query .= $comma.$this->escapeIdent($key).'='.$this->escapeString($value);
+			$comma  = ",";
+		}
+		return $query;
+	}
+	
+	private function createAND($data)
+	{
+		if (!is_array($data))
+		{
+			$this->error("SET (?m) placeholder expects array, ".gettype($data)." given");
+			return;
+		}
+		if (!$data)
+		{
+			$this->error("Empty array for SET (?m) placeholder");
+			return;
+		}
+		$query = $comma = '';
+		foreach ($data as $key => $value)
+		{
+			$query .= $comma.$this->escapeIdent($key).'='.$this->escapeString($value);
+			$comma  = ",";
+		}
+		return $query;
+	}
+
+	private function createOR($data)
+	{
+		if (!is_array($data))
+		{
+			$this->error("SET (?o) placeholder expects array, ".gettype($data)." given");
+			return;
+		}
+		if (!$data)
+		{
+			$this->error("Empty array for SET (?o) placeholder");
 			return;
 		}
 		$query = $comma = '';
